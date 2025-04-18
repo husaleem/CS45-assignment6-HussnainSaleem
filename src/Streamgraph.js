@@ -16,6 +16,7 @@ const Streamgraph = ({ data }) => {
 
   useEffect(() => {
     if (!data) return;
+
     d3.select(ref.current).selectAll("*").remove();
 
     const margin = { top: 20, right: 100, bottom: 30, left: 50 };
@@ -32,30 +33,30 @@ const Streamgraph = ({ data }) => {
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
     const keys = ["GPT4", "Gemini", "PaLM2", "Claude", "LLaMA"];
-    const stack = d3.stack().keys(keys).offset(d3.stackOffsetWiggle);
+    const stack = d3.stack()
+      .keys(keys)
+      .offset(d3.stackOffsetWiggle); // stream layout
+
     const series = stack(data);
 
-    const x = d3
-      .scaleTime()
+    const x = d3.scaleTime()
       .domain(d3.extent(data, d => d.date))
       .range([0, width]);
 
-    const y = d3
-      .scaleLinear()
+    const y = d3.scaleLinear()
       .domain([
         d3.min(series, layer => d3.min(layer, d => d[0])),
         d3.max(series, layer => d3.max(layer, d => d[1]))
       ])
       .range([height, 0]);
 
-    const area = d3
-      .area()
+    const area = d3.area()
+      .curve(d3.curveCatmullRom) // ✅ Smooth curved edges
       .x((d, i) => x(data[i].date))
       .y0(d => y(d[0]))
       .y1(d => y(d[1]));
 
-    svg
-      .selectAll("path")
+    svg.selectAll("path")
       .data(series)
       .join("path")
       .attr("d", area)
@@ -69,21 +70,26 @@ const Streamgraph = ({ data }) => {
 
         setTooltip({
           visible: true,
-          x: mx + margin.left + 20,  // tooltip offset X
-          y: my + margin.top - 60,   // tooltip offset Y
+          x: mx + margin.left + 20,
+          y: my + margin.top - 60,
           model,
           color: colors[model]
         });
       });
 
     // X Axis
-    svg
-      .append("g")
-      .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x));
+    svg.append("g")
+    .attr("transform", `translate(0,${height + 10})`)
+    .call(d3.axisBottom(x));
 
-    // Y Axis
-    svg.append("g").call(d3.axisLeft(y));
+    // Y Axis – Hidden ticks and numbers
+    svg.append("g")
+      .call(d3.axisLeft(y)
+        .tickValues([]) // no ticks
+        .tickFormat(() => "") // no numbers
+      )
+      .call(g => g.select(".domain").remove());
+
   }, [data]);
 
   return (
